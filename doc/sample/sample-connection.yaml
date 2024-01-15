@@ -1,0 +1,11 @@
+---
+apiVersion: edge-operator.k8s.lms.ru/v1
+kind: Connection
+metadata:
+  name: sample-connection
+spec:
+  deviceName: device01-01
+  networkName: bridge-conf
+  componentNames:
+    - tcp-udp-stream
+    - http

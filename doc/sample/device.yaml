@@ -1,0 +1,24 @@
+apiVersion: edge-operator.k8s.lms.ru/v1
+kind: Device
+metadata:
+  name: device01-01
+spec:
+  nodeName: kedge1
+  up: true
+  ipAddress: 172.17.16.120
+  components:
+    - name: tcp-udp-stream
+      up: true
+      handlers:
+        - name: tcp
+          protocol: TCP
+          port: 8080
+        - name: udp
+          protocol: UDP
+          port: 9090
+    - name: http
+      up: true
+      handlers:
+        - name: http
+          protocol: HTTP
+          port: 8000
