@@ -1,0 +1,38 @@
+name: PDF Build | Compile text of batchelor thesis into pdf
+
+env:
+  OPERATOR_IMAGE_NAME: ghcr.io/dvojak-cz/edge-operator
+  PDF_ARTEF_NAME: BP_Trojak_Jan
+
+
+on:
+  push:
+    branches: ["master", "text", "ci"]
+    paths: ["text/**"]
+  pull_request:
+    branches: ["master", "text", "ci"]
+    paths: ["text/**"]
+  workflow_call:
+    outputs:
+      ARTEFACT_NAME:
+        description: Name of the artefact
+        value: $PDF_ARTEF_NAME
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          lfs: true
+      - uses: xu-cheng/latex-action@v2
+        with:
+          root_file: BP_Trojak_Jan_2023.tex
+          working_directory: text
+          work_in_root_file_dir: text
+      - run: cp text/BP_Trojak_Jan_2023.pdf BP_Trojak_Jan.pdf
+      - name: Upload pdf
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{env.PDF_ARTEF_NAME}}
+          path: BP_Trojak_Jan.pdf

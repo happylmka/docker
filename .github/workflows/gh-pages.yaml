@@ -1,0 +1,81 @@
+name: Deloy doc | gp-pages
+
+env:
+  GH_REPO_URL: https://github.com/dvojak-cz/Bachelor-Thesis
+
+on:
+  push:
+    branches: ["master"]
+    paths: ["doc/**"]
+  pull_request:
+    branches: ["master"]
+    paths: ["doc/**"]
+  workflow_dispatch:
+
+
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: clone
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+      - run: mkdir public
+      - name: Build Index
+        uses: jaywcjlove/markdown-to-html-cli@main
+        with:
+          source: doc/README.md
+          output: public/index.html
+          github-corners: ${{env.GH_REPO_URL}}
+      - name: Build ab-set-up
+        uses: jaywcjlove/markdown-to-html-cli@main
+        with:
+          source: doc/lab-set-up.md
+          output: public/lab-set-up.html
+          github-corners: ${{env.GH_REPO_URL}}
+      - name: Build operator-configuration
+        uses: jaywcjlove/markdown-to-html-cli@main
+        with:
+          source: doc/operator-configuration.md
+          output: public/operator-configuration.html
+          github-corners: ${{env.GH_REPO_URL}}
+      - name: Build operator-install
+        uses: jaywcjlove/markdown-to-html-cli@main
+        with:
+          source: doc/operator-install.md
+          output: public/operator-install.html
+          github-corners: ${{env.GH_REPO_URL}}
+      - name: Build exmaple
+        uses: jaywcjlove/markdown-to-html-cli@main
+        with:
+          source: doc/example.md
+          output: public/example.html
+          github-corners: ${{env.GH_REPO_URL}}
+      - name: Build device
+        uses: jaywcjlove/markdown-to-html-cli@main
+        with:
+          source: doc/device.md
+          output: public/device.html
+          github-corners: ${{env.GH_REPO_URL}}
+      - name: Build connection
+        uses: jaywcjlove/markdown-to-html-cli@main
+        with:
+          source: doc/connection.md
+          output: public/connection.html
+          github-corners: ${{env.GH_REPO_URL}}
+      - name: Repair links
+        run: |
+          sed -i 's/README.md/\//g' public/*.html
+          sed -i 's/\.md/\.html/g' public/*.html
+      - uses: actions/upload-pages-artifact@v1
+        if: github.event_name != 'pull_request'
+        with:
+          path: public
+      - uses: actions/deploy-pages@v1

@@ -1,0 +1,59 @@
+name: Sample Servers | Build and push docker images
+
+env:
+  TCP_IMAGE_NAME: ghcr.io/dvojak-cz/tcp-server
+  UDP_IMAGE_NAME: ghcr.io/dvojak-cz/udp-server
+
+on:
+  push:
+    branches: ["master", "ci"]
+    paths: ["code/sampleServers/**"]
+  pull_request:
+    branches: ["master", "ci"]
+    paths: ["code/sampleServers/**"]
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  build_and_publish_tcp:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: code/sampleServers/tcpServer
+    steps:
+      - name: clone
+        uses: actions/checkout@v3
+      - name: 'Build tcp-server image'
+        run: docker build . --tag ${{env.TCP_IMAGE_NAME}}:${{github.ref_name}}
+      - name: 'Login to GitHub Container Registry'
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{github.actor}}
+          password: ${{secrets.GITHUB_TOKEN}}
+      - name: 'Push tcp-server image'
+        if: github.event_name != 'pull_request'  
+        run: docker push ${{env.TCP_IMAGE_NAME}}:${{github.ref_name}}
+
+  build_and_publish_udp:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: code/sampleServers/udpServer
+    steps:
+      - name: clone
+        uses: actions/checkout@v3
+      - name: 'Build udp-server image'
+        run: docker build . --tag ${{env.UDP_IMAGE_NAME}}:${{github.ref_name}}
+      - name: 'Login to GitHub Container Registry'
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{github.actor}}
+          password: ${{secrets.GITHUB_TOKEN}}
+      - name: 'Push udp-server image'
+        if: github.event_name != 'pull_request'
+        run: docker push ${{env.UDP_IMAGE_NAME}}:${{github.ref_name}}
+

@@ -1,0 +1,82 @@
+VAGRANT_BOX         = "ubuntu/focal64"
+CPUS_MASTER_NODE    = 2
+CPUS_WORKER_NODE    = 1
+MEMORY_MASTER_NODE  = 2048
+MEMORY_WORKER_NODE  = 1024
+WORKER_NODES_COUNT  = 1
+EDGE1               = true
+
+Vagrant.configure(2) do |config|
+
+  config.vm.provision "shell" do |s|
+    ssh_pub_keys = File.read("./.ssh_public_keys")
+    s.inline = <<-SHELL
+    echo #{ssh_pub_keys} >> /home/vagrant/.ssh/authorized_keys
+    echo #{ssh_pub_keys} >> /root/.ssh/authorized_keys
+    SHELL
+  end
+
+  if Vagrant.has_plugin?("vagrant-vbguest")
+    config.vbguest.auto_update = false
+  end
+
+  # Kubernetes Master Server
+  config.vm.define "kmaster" do |node|
+    node.vm.box               = VAGRANT_BOX
+    node.vm.hostname          = "kmaster.example.com"
+
+    node.vm.network "forwarded_port", guest: 6443, host: 6443, protocol: "tcp"
+    node.vm.network "private_network", ip: "172.16.16.100"
+
+    node.vm.provider :virtualbox do |v|
+      v.name    = "kmaster"
+      v.memory  = MEMORY_MASTER_NODE
+      v.cpus    = CPUS_MASTER_NODE
+    end
+  end
+
+  # Kubernetes Worker Nodes
+  (1..WORKER_NODES_COUNT).each do |i|
+    config.vm.define "kworker#{i}" do |node|
+      node.vm.box               = VAGRANT_BOX
+      node.vm.hostname          = "kworker#{i}.example.com"
+
+      node.vm.network "private_network", ip: "172.16.16.10#{i}"
+
+      node.vm.provider :virtualbox do |v|
+        v.name    = "kworker#{i}"
+        v.memory  = MEMORY_WORKER_NODE
+        v.cpus    = CPUS_WORKER_NODE
+
+      end
+    end
+  end
+
+  if EDGE1
+    config.vm.define "kedge1" do |node|
+      node.vm.box               = VAGRANT_BOX
+      node.vm.hostname          = "kedge1.example.com"
+
+      node.vm.network "private_network", ip: "172.16.16.111"
+      node.vm.network "private_network",  ip: "172.17.16.111" , virtualbox__intnet: true,  name: "edge1"
+
+      node.vm.provider :virtualbox do |v|
+        v.name    = "kedge1"
+        v.memory  = MEMORY_WORKER_NODE
+        v.cpus    = CPUS_WORKER_NODE
+      end
+    end
+
+    config.vm.define "device01-01" do |node|
+      node.vm.box               = VAGRANT_BOX
+      node.vm.hostname          = "device01-01.example.com"
+
+      node.vm.network "private_network", ip: "172.17.16.120", virtualbox__intnet: true,  name: "edge1"
+
+      node.vm.provider "virtualbox" do |vb|
+          vb.memory = 1024
+          vb.cpus = 1
+      end
+    end
+  end
+end

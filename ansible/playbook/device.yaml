@@ -1,0 +1,60 @@
+---
+- hosts: ["device"]
+  become: true
+  tasks:
+    - name: docker | add key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        keyring: "/usr/share/keyrings/docker.gpg"
+    - name: docker | add repo
+      apt_repository:
+        repo: |
+          deb [signed-by=/usr/share/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ansible_distribution_release}} stable
+        filename: docker
+    - name: install docker
+      loop: ["docker-ce", "docker-ce-cli", "containerd.io", "docker-compose-plugin"]
+      apt:
+        name: "{{item}}"
+        state: latest
+        install_recommends: no
+    - name: add vagrant user to docker group
+      user:
+        name: vagrant
+        groups: ["docker"] 
+        append: yes
+- hosts: ["device"]
+  become: true
+  tasks:
+    - name: add route to pods
+      shell:
+        cmd: ip route add 10.10.0.0/24 dev enp0s8
+      ignore_errors: yes
+- hosts: ["device"]
+  tasks:
+    - name: create docker-compose.yaml
+      copy:
+        dest: ~/docker-compose.yaml
+        content: |
+          version: "3"
+          services:
+            tcp:
+              image: trojaj12/tcp-server
+              ports:
+                - "8080:8080"
+              command: ["0.0.0.0", "8080"]
+              container_name: tcp
+              restart: always
+            udp:
+              image: trojaj12/udp-server
+              ports:
+                - "9090:9090/udp"
+              command: ["0.0.0.0", "9090"]
+              container_name: udp
+              restart: always
+            http:
+              image: nginx
+              ports:
+                - "8000:80"
+              container_name: http
+              restart: always
+          

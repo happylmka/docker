@@ -1,0 +1,207 @@
+---
+- hosts: ["master", "worker", "edge"]
+  become: true
+  vars_files: ["../vars/users.yaml"]
+  tasks:
+    - name: stop and Disable firewall
+      systemd:
+        name: ufw
+        state: stopped
+        enabled: false
+
+    - name: disable swap
+      block:
+        - name: delete swap record fstab comments
+          lineinfile:
+            path: /etc/fstab
+            regexp: "^.*swap.*$"
+            state: absent
+
+        - name: disable swap
+          command: swapoff -a
+
+    - name: setup kernel and iptables
+      block:
+        - name: loading required modules
+          loop: ["overlay", "br_netfilter"]
+          community.general.modprobe:
+            name: "{{item}}"
+
+        - name: Create file with kernel modules
+          loop: ["overlay", "br_netfilter"]
+          lineinfile:
+            path: /etc/modules-load.d/containerd.conf
+            line: "{{item}}"
+            owner: root
+            group: root
+            mode: "0644"
+            create: true
+
+        - name: set kernel params for containerd
+          loop:
+            - name: net.bridge.bridge-nf-call-iptables
+              value: "1"
+            - name: net.ipv4.ip_forward
+              value: "1"
+            - name: net.bridge.bridge-nf-call-ip6tables
+              value: "1"
+          ansible.posix.sysctl:
+            name: "{{item.name}}"
+            value: "{{item.value}}"
+            state: present
+            sysctl_file: "/etc/sysctl.d/kubernetes.conf"
+
+        - name: apply kernel changes
+          become: true
+          command: sysctl --system
+
+    - name: instal containerd
+      block:
+        - name: install
+          block:
+            - name: Add download.docker.com apt key
+              apt_key:
+                url: https://download.docker.com/linux/ubuntu/gpg
+                state: present
+
+            - name: Add download.docker.com apt repository
+              apt_repository:
+                repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
+                state: present
+                filename: docker
+
+            - name: install containerd
+              package:
+                name: ["containerd.io"]
+                update_cache: yes
+                state: latest
+
+        - name: configure
+          block:
+            - name: Create /etc/containerd directory if it does not exist
+              file:
+                path: /etc/containerd
+                state: directory
+                mode: "0755"
+
+            - name: check if config /etc/containerd/config.toml file exists
+              stat:
+                path: /etc/containerd/config.toml
+              register: stat
+
+            - block:
+                - name: generate config for containerd
+                  command: containerd config default
+                  register: command_output
+
+                - name: Write config to file
+                  copy:
+                    content: "{{ command_output.stdout }}"
+                    dest: /etc/containerd/config.toml
+                  register: write_config
+
+                - name: Replace a text in a file
+                  replace:
+                    path: /etc/containerd/config.toml
+                    regexp: "SystemdCgroup = false"
+                    replace: "SystemdCgroup = true"
+                  when: write_config.changed
+
+        - name: enable and start containerd
+          systemd:
+            name: containerd
+            state: restarted
+            enabled: true
+            daemon_reload: true
+
+    - name: instal k8s
+      block:
+        - name: Add cloud.google.com apt key
+          apt_key:
+            url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+            state: present
+
+        - name: Add apt.kubernetes.io apt repository
+          apt_repository:
+            repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
+            state: present
+            filename: kubernetes
+
+        - name: Install K8S tools
+          apt:
+            name:
+              ["kubeadm=1.26.0-00", "kubelet=1.26.0-00", "kubectl=1.26.0-00"]
+            state: present
+            update_cache: true
+
+        - name: Enable kubelet
+          systemd:
+            name: kubelet
+            state: started
+            enabled: true
+
+    - name: Add user for k8s
+      tags: ["users"]
+      block:
+        - name: Add user
+          loop: "{{USERS}}"
+          user:
+            name: "{{item.name}}"
+            generate_ssh_key: no
+            password: "{{ item.password | default(item.name) | password_hash('sha512') }}"
+            append: yes
+            groups: "{{ item.groups | default([]) }}"
+            shell: /bin/bash
+
+        - name: Add user to sudoers
+          loop: "{{USERS}}"
+          when: item.sudoers is defined
+          community.general.sudoers:
+            name: "{{item.name}}"
+            user: "{{item.name}}"
+            commands: "{{item.sudoers}}"
+            runas: ALL
+            nopassword: yes
+
+        - name: autocomplete kubecomplete
+          loop: "{{USERS}}"
+          when: item.kubecomplete is defined and item.kubecomplete is true
+          lineinfile:
+            path: /home/{{item.name}}/.bashrc
+            create: true
+            line: source <(kubectl completion bash)
+
+        - name: Create a ~/.kube directory
+          loop: "{{USERS}}"
+          file:
+            path: /home/{{item.name}}/.kube
+            group: "{{item.name}}"
+            owner: "{{item.name}}"
+            state: directory
+            mode: "0700"
+
+- hosts: ["master", "worker", "edge"]
+  become: true
+  tasks:
+    - name: Set node ip
+      lineinfile:
+        path: /etc/default/kubelet
+        regexp: "^KUBELET_EXTRA_ARGS="
+        line: KUBELET_EXTRA_ARGS="--node-ip={{k8s_ip | default(ansible_ssh_host)}}"
+        create: true
+    - name: restart kubelet
+      systemd:
+        name: kubelet
+        state: restarted
+- hosts: ["edge"]
+  become: true
+  tasks:
+    - name: set kernel params for containerd
+      loop:
+        - name: net.ipv4.conf.all.proxy_arp
+          value: "1"
+      ansible.posix.sysctl:
+        name: "{{item.name}}"
+        value: "{{item.value}}"
+        state: present
+        sysctl_file: "/etc/sysctl.d/kubernetes-edge.conf"

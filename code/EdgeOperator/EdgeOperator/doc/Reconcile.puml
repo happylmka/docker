@@ -1,0 +1,23 @@
+@startuml
+start
+
+:Získání jména objektů;
+:Kontrola existence deploymentu;
+if (Deployment existuje) then (ne)
+    :Vytvoření definice Deploymentu;
+    :Vytvoření objektu Deployment;
+else (ano)
+    :Vytvoření definice Deploymentu;
+    :Aktualizace objektu Deployment;
+endif
+:Kontrola existence service;
+if (Service existuje) then (ne)
+    :Vytvoření definice Service;
+    :Vytvoření objektu Service;
+else (ano)
+    :Vytvoření definice Service;
+    :Aktualizace objektu Service;
+endif
+
+stop
+@enduml

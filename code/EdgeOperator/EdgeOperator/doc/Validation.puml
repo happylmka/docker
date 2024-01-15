@@ -1,0 +1,18 @@
+@startuml
+start
+
+:Přijmutí požadavku;
+:Validace požadavku;
+if (Požadavek je validní) then (yes)
+    :Přijmutí požadavku;
+else (ne)
+    if (Striktní mód validace je zapnut) then (yes)
+        :Odmítnutí požadavku;
+    else (ne)
+        :Upozornění na nevalidní požadavek;
+        :Přijmutí požadavku;
+    endif
+endif
+
+stop
+@enduml

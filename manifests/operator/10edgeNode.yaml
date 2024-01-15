@@ -1,0 +1,15 @@
+#kubectl apply -f env-edge-node.yaml
+---
+#kubectl taint nodes kedge1 key1=edge:NoSchedule
+#kubectl label nodes kedge1 edge='true'
+apiVersion: v1
+kind: Node
+metadata:
+  name: kedge1
+  labels:
+    edge: "true"
+spec:
+  taints:
+    - key: key1
+      value: edge
+      effect: NoSchedule

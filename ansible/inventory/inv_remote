@@ -1,0 +1,12 @@
+[master]
+kmaster ansible_ssh_host=localhost ansible_ssh_port=9900 k8s_ip=172.16.16.100
+
+[worker]
+kworker1 ansible_ssh_host=localhost ansible_ssh_port=9901 k8s_ip=172.16.16.101
+#kworker2 ansible_ssh_host=localhost ansible_ssh_port=9902 k8s_ip=172.16.16.102
+
+[edge]
+kedge1 ansible_ssh_host=localhost ansible_ssh_port=9911 k8s_ip=172.16.16.111
+
+[device]
+device01-01 ansible_ssh_host=localhost ansible_ssh_port=9920

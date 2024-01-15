@@ -1,0 +1,5 @@
+---
+USERS:
+  - name: kube
+    sudoers: ["/usr/bin/kubeadm", "/usr/bin/kubectl", "/usr/bin/kubelet"]
+    kubecomplete: true

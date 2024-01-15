@@ -1,0 +1,42 @@
+on:
+  push:
+    tags: ["v*.*.*"]
+
+env:
+  CONFIG_RELEASE_NAME: config.tar.gz
+  PDF_RELEASE_NAME: BP_Trojak_Jan.pdf
+
+name: Create Release
+jobs:
+  call-pdf-build:
+    uses: ./.github/workflows/pdf-build.yml
+  call-operator-build:
+    uses: ./.github/workflows/operator-docker-build.yaml
+
+  build:
+    name: Create Release
+    needs: ["call-pdf-build", "call-operator-build"]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download pdf-build artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: BP_Trojak_Jan
+          path: pdf/
+      - name: Download config-build artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: config
+          path: config/
+      - run: mv pdf/BP_Trojak_Jan.pdf ${{env.PDF_RELEASE_NAME}}
+      - run: tar -czf ${{env.CONFIG_RELEASE_NAME}} config/
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body: ${{ github.event.head_commit.message }}
+          draft: false
+          prerelease: false
+          name:
+          files: |
+            ${{env.PDF_RELEASE_NAME}}
+            ${{env.CONFIG_RELEASE_NAME}}

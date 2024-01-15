@@ -1,0 +1,22 @@
+version: '3'
+services:
+  tcp:
+    image: trojaj12/tcp-server
+    ports:
+      - "8080:8080"
+    command: ["0.0.0.0", "8080"]
+    container_name: tcp
+    restart: always
+  udp:
+    image: trojaj12/udp-server
+    ports:
+      - "9090:9090/udp"
+    command: ["0.0.0.0", "9090"]
+    container_name: udp
+    restart: always
+  http:
+    image: nginx
+    ports:
+      - "8000:80"
+    container_name: http
+    restart: always

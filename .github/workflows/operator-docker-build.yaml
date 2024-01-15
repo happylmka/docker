@@ -1,0 +1,80 @@
+name: Operator Build | Build and push operator docker images
+
+env:
+  OPERATOR_IMAGE_NAME: ghcr.io/dvojak-cz/edge-operator
+  CONFIG_ARTEF_NAME: config
+
+on:
+  push:
+    branches: ["master", "ci"]
+    paths: ["code/EdgeOperator/**"]
+  pull_request:
+    branches: ["master", "ci"]
+    paths: ["code/EdgeOperator/**"]
+  workflow_call:
+    outputs:
+      ARTEFACT_NAME:
+        description: Name of the artefact
+        value: $CONFIG_ARTEF_NAME
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dotnet-version: [ '6.0.x' ]
+    defaults:
+      run:
+        working-directory: code/EdgeOperator
+    steps:
+      - name: clone
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Setup .NET Core SDK ${{ matrix.dotnet-version }}
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: ${{ matrix.dotnet-version }}
+      - name: Install dependencies
+        run: dotnet restore
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+      - name: Test
+        run: dotnet test --no-restore --verbosity normal
+      - name: Delete certs
+        run: rm -rf EdgeOperator/config/operator/{ca-key.pem,ca.csr,ca.pem}
+      - name: Edit image version in conf
+        run: |
+          sed -Ei "s|newTag:.*|newTag: ${{github.ref_name}}|" EdgeOperator/config/install/kustomization.yaml
+      - name: Edit image name in conf
+        run: |
+          sed -Ei "s|newName:.*|newName: ${{env.OPERATOR_IMAGE_NAME}}|" EdgeOperator/config/install/kustomization.yaml
+      - name: Upload config artefact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{env.CONFIG_ARTEF_NAME}}
+          path: code/EdgeOperator/EdgeOperator/config
+          if-no-files-found: error
+
+  build_and_push_docker:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    needs: test
+    defaults:
+      run:
+        working-directory: code/EdgeOperator/EdgeOperator
+    steps:
+      - name: clone
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: 'Build edge-operator image'
+        run: docker build . --tag ${{env.OPERATOR_IMAGE_NAME}}:${{github.ref_name}}
+      - name: 'Login to GitHub Container Registry'
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{github.actor}}
+          password: ${{secrets.GITHUB_TOKEN}}
+      - name: 'Push edge-operator image'
+        run: docker push  ${{env.OPERATOR_IMAGE_NAME}}:${{github.ref_name}}
